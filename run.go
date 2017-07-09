@@ -1,8 +1,8 @@
 package main
 
 import (
-	"mycontainer/container"
 	log "github.com/Sirupsen/logrus"
+	"mycontainer/container"
 	"os"
 )
 

@@ -1,8 +1,8 @@
 package main
 
 import (
-	"github.com/urfave/cli"
 	"github.com/Sirupsen/logrus"
+	"github.com/urfave/cli"
 	"os"
 )
 
@@ -12,7 +12,12 @@ func main() {
 	app := cli.NewApp()
 	app.Name = "mycontainer"
 	app.Usage = usage
-	
+
+	app.Commands = []cli.Command{
+		initCommand,
+		runCommand,
+	}
+
 	app.Before = func(context *cli.Context) error {
 		logrus.SetFormatter(&logrus.JSONFormatter{})
 		logrus.SetOutput(os.Stdout)
