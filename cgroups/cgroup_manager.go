@@ -1,8 +1,8 @@
 package cgroups
 
 import (
-	"mycontainer/cgroups/subsystems"
 	"github.com/Sirupsen/logrus"
+	"mycontainer/cgroups/subsystems"
 )
 
 type CgroupManager struct {
