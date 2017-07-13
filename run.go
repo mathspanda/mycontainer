@@ -9,8 +9,8 @@ import (
 	"strings"
 )
 
-func Run(tty bool, command string, res *subsystems.ResourceConfig) {
-	parent, _ := container.NewParentProcess(tty, command)
+func Run(tty bool, cmdArray []string, res *subsystems.ResourceConfig) {
+	parent, writePipe := container.NewParentProcess(tty)
 	if parent == nil {
 		log.Error("New parent process error")
 		return
@@ -19,18 +19,20 @@ func Run(tty bool, command string, res *subsystems.ResourceConfig) {
 		log.Error(err)
 	}
 
+	// cgroups
 	cgroupManager := cgroups.NewCgroupManager("mycontainer")
 	defer cgroupManager.Destroy()
 	cgroupManager.Set(res)
 	cgroupManager.Apply(parent.Process.Pid)
 
-	//sendInitCommand(comArray, writePipe)
+	sendInitCommand(cmdArray, writePipe)
 	parent.Wait()
+	os.Exit(0)
 }
 
-func sendInitCommand(comArray []string, writePipe *os.File) {
-	command := strings.Join(comArray, " ")
+func sendInitCommand(cmdArray []string, writePipe *os.File) {
+	command := strings.Join(cmdArray, " ")
 	log.Infof("command all is %s", command)
-	writePipe.WriteAt([]byte(command), 0)
+	writePipe.WriteString(command)
 	writePipe.Close()
 }

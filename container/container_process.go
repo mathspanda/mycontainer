@@ -1,31 +1,52 @@
 package container
 
 import (
+	"fmt"
 	log "github.com/Sirupsen/logrus"
+	"io/ioutil"
 	"os"
 	"os/exec"
+	"strings"
 	"syscall"
 )
 
-func RunContainerInitProcess(command string, args []string) error {
+func RunContainerInitProcess() error {
+	cmdArray := readUserCommand()
+	if cmdArray == nil || len(cmdArray) == 0 {
+		return fmt.Errorf("Run container init procss error, command is empty")
+	}
+
 	defaultMountFlags := syscall.MS_NOEXEC | syscall.MS_NOSUID | syscall.MS_NODEV
 	syscall.Mount("proc", "/proc", "proc", uintptr(defaultMountFlags), "")
-	argv := []string{command}
-	if err := syscall.Exec(command, argv, os.Environ()); err != nil {
+
+	path, err := exec.LookPath(cmdArray[0])
+	if err != nil {
+		log.Errorf("Exec lookup path %v error %v", cmdArray[0], err)
+		return err
+	}
+
+	log.Infof("Find command %v path %v", cmdArray[0], path)
+
+	if err := syscall.Exec(path, cmdArray, os.Environ()); err != nil {
 		log.Errorf(err.Error())
 	}
 	return nil
 }
 
-func NewParentProcess(tty bool, command string) (*exec.Cmd, *os.File) {
+func NewParentProcess(tty bool) (*exec.Cmd, *os.File) {
 	readPipe, writePipe, err := NewPipe()
 	if err != nil {
 		log.Errorf("New pipe error %v", err)
 		return nil, nil
 	}
 
-	args := []string{"init", command}
-	cmd := exec.Command("/proc/self/exe", args...)
+	initCmd, err := os.Readlink("/proc/self/exe")
+	if err != nil {
+		log.Errorf("get init process error %v", err)
+		return nil, nil
+	}
+
+	cmd := exec.Command(initCmd, "init")
 	cmd.SysProcAttr = &syscall.SysProcAttr{
 		Cloneflags: syscall.CLONE_NEWUTS | syscall.CLONE_NEWPID | syscall.CLONE_NEWNS | syscall.CLONE_NEWNET | syscall.CLONE_NEWIPC,
 	}
@@ -45,4 +66,15 @@ func NewPipe() (*os.File, *os.File, error) {
 		return nil, nil, err
 	}
 	return read, write, nil
+}
+
+func readUserCommand() []string {
+	pipe := os.NewFile(uintptr(3), "pipe")
+	msg, err := ioutil.ReadAll(pipe)
+	if err != nil {
+		log.Errorf("init read pipe error %v", err)
+		return nil
+	}
+	msgStr := string(msg)
+	return strings.Split(msgStr, " ")
 }
