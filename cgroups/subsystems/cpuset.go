@@ -1,20 +1,48 @@
 package subsystems
 
+import (
+	"fmt"
+	"io/ioutil"
+	"os"
+	"path"
+	"strconv"
+)
+
 type CpusetSubsystem struct {
 }
 
 func (s *CpusetSubsystem) Set(cgroupPath string, res *ResourceConfig) error {
-	return nil
+	if subsysCgroupPath, err := GetCgroupPath(s.Name(), cgroupPath, true); err == nil {
+		if res.CpuSet != "" {
+			if err := ioutil.WriteFile(path.Join(subsysCgroupPath, "cpuset.cpus"), []byte(res.CpuSet), 0644); err != nil {
+				return fmt.Errorf("set cgroup cpuset fail %v", err)
+			}
+		}
+		return nil
+	} else {
+		return err
+	}
 }
 
 func (s *CpusetSubsystem) Apply(cgroupPath string, pid int) error {
-	return nil
+	if subsysCgroupPath, err := GetCgroupPath(s.Name(), cgroupPath, false); err == nil {
+		if err := ioutil.WriteFile(path.Join(subsysCgroupPath, "tasks"), []byte(strconv.Itoa(pid)), 0644); err != nil {
+			return fmt.Errorf("set cgroup proc fail %v", err)
+		}
+		return nil
+	} else {
+		return fmt.Errorf("get cgroup %s error: %v", cgroupPath, err)
+	}
 }
 
 func (s *CpusetSubsystem) Remove(cgroupPath string) error {
-	return nil
+	if subsysCgroupPath, err := GetCgroupPath(s.Name(), cgroupPath, false); err == nil {
+		return os.Remove(subsysCgroupPath)
+	} else {
+		return err
+	}
 }
 
 func (s *CpusetSubsystem) Name() string {
-	return nil
+	return "cpuset"
 }
