@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"syscall"
+	"strings"
 )
 
 func pivotRoot(root string) error {
@@ -53,10 +54,39 @@ func setUpMount() {
 	syscall.Mount("tmpfs", "/dev", "tmpfs", syscall.MS_NOSUID|syscall.MS_STRICTATIME, "mode=755")
 }
 
-func NewWorkSpace(rootUrl string, mntUrl string) {
+func NewWorkSpace(rootUrl string, mntUrl string, volume string) {
 	CreateReadOnlyLayer(rootUrl)
 	CreateWriteLayer(rootUrl)
 	CreateMountPoint(rootUrl, mntUrl)
+	if volume != "" {
+		volumeUrls := volumeUrlExtract(volume)
+		if len(volumeUrls) == 2 && volumeUrls[0] != "" && volumeUrls[1] != "" {
+			log.Infof("mount %q", volumeUrls)
+			MountVolume(mntUrl, volumeUrls)
+		} else {
+			log.Infof("volume parameter is not correct")
+		}
+	}
+}
+
+func MountVolume(mntUrl string, volumeUrls []string) {
+	parentUrl := volumeUrls[0]
+	if err := os.Mkdir(parentUrl, 0777); err != nil {
+		log.Infof("Mkdir parent dir %s error: %v", parentUrl, err)
+	}
+
+	containerUrl := mntUrl + volumeUrls[1]
+	if err := os.Mkdir(containerUrl, 0777); err != nil {
+		log.Infof("Mkdir container dir %s error: %v", containerUrl, err)
+	}
+
+	dirs := "dirs=" + parentUrl
+	cmd := exec.Command("mount", "-t", "aufs", "-o", dirs, "none", containerUrl)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		log.Errorf("Mount volume error: %v", err)
+	}
 }
 
 func CreateReadOnlyLayer(rootUrl string) {
@@ -97,7 +127,13 @@ func CreateMountPoint(rootUrl string, mntUrl string) {
 	}
 }
 
-func DeleteWorkSpace(rootUrl string, mntUrl string) {
+func DeleteWorkSpace(rootUrl string, mntUrl string, volume string) {
+	if volume != "" {
+		volumeUrls := volumeUrlExtract(volume)
+		if len(volumeUrls) == 2 && volumeUrls[0] != "" && volumeUrls[1] != "" {
+			DeleteVolumeMountPoint(mntUrl, volumeUrls)
+		}
+	}
 	DeleteMountPoint(mntUrl)
 	DeleteWriteUrl(rootUrl)
 }
@@ -107,10 +143,20 @@ func DeleteMountPoint(mntUrl string) {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
-		log.Errorf("umount %s error: %v", mntUrl, err)
+		log.Errorf("aufs umount %s error: %v", mntUrl, err)
 	}
 	if err := os.RemoveAll(mntUrl); err != nil {
 		log.Errorf("Remove dir %s error: %v", mntUrl, err)
+	}
+}
+
+func DeleteVolumeMountPoint(mntUrl string, volumeUrls []string) {
+	containerUrl := mntUrl + volumeUrls[1]
+	cmd := exec.Command("umount", containerUrl)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		log.Errorf("umount volume %s error: %v", volumeUrls[1], err)
 	}
 }
 
@@ -119,6 +165,11 @@ func DeleteWriteUrl(rootUrl string) {
 	if err := os.RemoveAll(writeUrl); err != nil {
 		log.Errorf("Remove dir %s error: %v", writeUrl, err)
 	}
+}
+
+func volumeUrlExtract(volume string) []string {
+	volumeUrls := strings.Split(volume, ":")
+	return volumeUrls
 }
 
 func PathExists(path string) (bool, error) {
