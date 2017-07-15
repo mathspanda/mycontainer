@@ -27,6 +27,7 @@ func Run(tty bool, cmdArray []string, res *subsystems.ResourceConfig) {
 
 	sendInitCommand(cmdArray, writePipe)
 	parent.Wait()
+	container.DeleteWorkSpace("/root/", "/root/mnt/")
 	os.Exit(0)
 }
 
