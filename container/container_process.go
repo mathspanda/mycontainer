@@ -16,8 +16,7 @@ func RunContainerInitProcess() error {
 		return fmt.Errorf("Run container init procss error, command is empty")
 	}
 
-	defaultMountFlags := syscall.MS_NOEXEC | syscall.MS_NOSUID | syscall.MS_NODEV
-	syscall.Mount("proc", "/proc", "proc", uintptr(defaultMountFlags), "")
+	setUpMount()
 
 	path, err := exec.LookPath(cmdArray[0])
 	if err != nil {
@@ -56,6 +55,7 @@ func NewParentProcess(tty bool) (*exec.Cmd, *os.File) {
 		cmd.Stderr = os.Stderr
 	}
 	cmd.ExtraFiles = []*os.File{readPipe}
+	cmd.Dir = "/root/busybox"
 
 	return cmd, writePipe
 }
