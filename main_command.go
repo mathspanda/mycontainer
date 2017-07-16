@@ -6,6 +6,7 @@ import (
 	"github.com/urfave/cli"
 	"mycontainer/cgroups/subsystems"
 	"mycontainer/container"
+	"os"
 )
 
 var runCommand = cli.Command{
@@ -97,9 +98,45 @@ var commitCommand = cli.Command{
 
 var listCommand = cli.Command{
 	Name:  "ps",
-	Usage: "list all containers",
+	Usage: "List all containers",
 	Action: func(context *cli.Context) error {
 		ListContainers()
+		return nil
+	},
+}
+
+var logCommand = cli.Command{
+	Name:  "logs",
+	Usage: "Print logs of a container",
+	Action: func(context *cli.Context) error {
+		if len(context.Args()) < 1 {
+			return fmt.Errorf("Missing container name")
+		}
+		containerName := context.Args().Get(0)
+		logContainer(containerName)
+		return nil
+	},
+}
+
+var execCommand = cli.Command{
+	Name:  "exec",
+	Usage: "Exec a command into container",
+	Action: func(context *cli.Context) error {
+		if os.Getenv(ENV_EXEC_CMD) != "" {
+			return nil
+		}
+
+		if len(context.Args()) < 2 {
+			return fmt.Errorf("Missing container name or command")
+		}
+
+		containerName := context.Args().Get(0)
+		var commandArr []string
+		for _, arg := range context.Args().Tail() {
+			commandArr = append(commandArr, arg)
+		}
+		ExecContainer(containerName, commandArr)
+
 		return nil
 	},
 }

@@ -10,6 +10,10 @@ import (
 	"syscall"
 )
 
+var (
+	ContainerLogFile string = "container.log"
+)
+
 func RunContainerInitProcess() error {
 	cmdArray := readUserCommand()
 	if cmdArray == nil || len(cmdArray) == 0 {
@@ -32,7 +36,7 @@ func RunContainerInitProcess() error {
 	return nil
 }
 
-func NewParentProcess(tty bool, volume string) (*exec.Cmd, *os.File) {
+func NewParentProcess(containerName string, tty bool, volume string) (*exec.Cmd, *os.File) {
 	readPipe, writePipe, err := NewPipe()
 	if err != nil {
 		log.Errorf("New pipe error %v", err)
@@ -53,9 +57,22 @@ func NewParentProcess(tty bool, volume string) (*exec.Cmd, *os.File) {
 		cmd.Stdin = os.Stdin
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
+	} else {
+		dirUrl := fmt.Sprintf(DefaultInfoLocation, containerName)
+		if err := os.Mkdir(dirUrl, 0622); err != nil {
+			log.Errorf("Mkdir dir %s error: %v", dirUrl, err)
+			return nil, nil
+		}
+		stdLogFilePath := dirUrl + ContainerLogFile
+		stdLogFile, err := os.Create(stdLogFilePath)
+		if err != nil {
+			log.Errorf("Create file %s error: %v", stdLogFilePath, err)
+			return nil, nil
+		}
+		cmd.Stdout = stdLogFile
 	}
-	cmd.ExtraFiles = []*os.File{readPipe}
 
+	cmd.ExtraFiles = []*os.File{readPipe}
 	mntUrl := "/root/mnt/"
 	rootUrl := "/root/"
 	NewWorkSpace(rootUrl, mntUrl, volume)

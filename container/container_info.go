@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	log "github.com/Sirupsen/logrus"
-	"math/rand"
 	"os"
 	"strconv"
 	"strings"
@@ -30,13 +29,12 @@ var (
 	ConfigName          string = "config.json"
 )
 
-func RecordContainerInfo(containerPid int, containerName string, commandArray []string, volume string) (string, error) {
-	id := randStringBytes(10)
+func RecordContainerInfo(id string, containerPid int, containerName string, commandArray []string, volume string) (string, error) {
 	createTime := time.Now().Format("2006-01-02 15:04:05")
 	command := strings.Join(commandArray, " ")
-	if containerName == "" {
-		containerName = id
-	}
+	//if containerName == "" {
+	//	containerName = id
+	//}
 
 	containerInfo := &ContainerInfo{
 		Id:         id,
@@ -55,10 +53,10 @@ func RecordContainerInfo(containerPid int, containerName string, commandArray []
 	}
 
 	dirUrl := fmt.Sprintf(DefaultInfoLocation, containerName)
-	if err := os.Mkdir(dirUrl, 0622); err != nil {
-		log.Errorf("Mkdir dir %s error: %v", dirUrl, err)
-		return "", err
-	}
+	//if err := os.Mkdir(dirUrl, 0622); err != nil {
+	//	log.Errorf("Mkdir dir %s error: %v", dirUrl, err)
+	//	return "", err
+	//}
 
 	fileName := dirUrl + "/" + ConfigName
 	file, err := os.Create(fileName)
@@ -81,14 +79,4 @@ func DeleteContainerInfo(containerName string) {
 	if err := os.RemoveAll(dirUrl); err != nil {
 		log.Errorf("Remove dir %s error: %v", dirUrl, err)
 	}
-}
-
-func randStringBytes(n int) string {
-	letterBytes := "1234567890abcdefghijklmnopqrstuvwxyz"
-	rand.Seed(time.Now().UnixNano())
-	b := make([]byte, n)
-	for i := range b {
-		b[i] = letterBytes[rand.Intn(len(letterBytes))]
-	}
-	return string(b)
 }
