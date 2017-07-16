@@ -42,6 +42,10 @@ var runCommand = cli.Command{
 			Name:  "name",
 			Usage: "container name",
 		},
+		cli.StringSliceFlag{
+			Name: "e",
+			Usage: "set environment",
+		},
 	},
 	Action: func(context *cli.Context) error {
 		if len(context.Args()) < 1 {
@@ -53,6 +57,9 @@ var runCommand = cli.Command{
 			cmdArray = append(cmdArray, arg)
 		}
 
+		imageName := cmdArray[0]
+		cmdArray = cmdArray[1:]
+
 		tty := context.Bool("ti")
 		detach := context.Bool("d")
 		if tty && detach {
@@ -61,6 +68,7 @@ var runCommand = cli.Command{
 
 		volume := context.String("v")
 		containerName := context.String("name")
+		envSlice := context.StringSlice("e")
 
 		resConf := &subsystems.ResourceConfig{
 			MemoryLimit: context.String("m"),
@@ -68,7 +76,7 @@ var runCommand = cli.Command{
 			CpuShare:    context.String("cpushare"),
 		}
 
-		Run(containerName, tty, cmdArray, resConf, volume)
+		Run(containerName, tty, cmdArray, resConf, volume, imageName, envSlice)
 		return nil
 	},
 }
@@ -87,11 +95,12 @@ var commitCommand = cli.Command{
 	Name:  "commit",
 	Usage: "Commit a container into image",
 	Action: func(context *cli.Context) error {
-		if len(context.Args()) < 1 {
-			return fmt.Errorf("Missing container name")
+		if len(context.Args()) < 2 {
+			return fmt.Errorf("Missing container name or image name")
 		}
-		imageName := context.Args().Get(0)
-		commitContainer(imageName)
+		containerName := context.Args().Get(0)
+		imageName := context.Args().Get(1)
+		commitContainer(containerName, imageName)
 		return nil
 	},
 }

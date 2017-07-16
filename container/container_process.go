@@ -12,6 +12,9 @@ import (
 
 var (
 	ContainerLogFile string = "container.log"
+	RootUrl          string = "/root"
+	MntUrl           string = "/root/mnt/%s"
+	WriteLayerUrl    string = "/root/writeLayer/%s"
 )
 
 func RunContainerInitProcess() error {
@@ -36,7 +39,7 @@ func RunContainerInitProcess() error {
 	return nil
 }
 
-func NewParentProcess(containerName string, tty bool, volume string) (*exec.Cmd, *os.File) {
+func NewParentProcess(containerName string, tty bool, volume string, imageName string, envSlice []string) (*exec.Cmd, *os.File) {
 	readPipe, writePipe, err := NewPipe()
 	if err != nil {
 		log.Errorf("New pipe error %v", err)
@@ -53,16 +56,18 @@ func NewParentProcess(containerName string, tty bool, volume string) (*exec.Cmd,
 	cmd.SysProcAttr = &syscall.SysProcAttr{
 		Cloneflags: syscall.CLONE_NEWUTS | syscall.CLONE_NEWPID | syscall.CLONE_NEWNS | syscall.CLONE_NEWNET | syscall.CLONE_NEWIPC,
 	}
+
+	dirUrl := fmt.Sprintf(DefaultInfoLocation, containerName)
+	if err := os.MkdirAll(dirUrl, 0622); err != nil {
+		log.Errorf("Mkdir dir %s error: %v", dirUrl, err)
+		return nil, nil
+	}
+
 	if tty {
 		cmd.Stdin = os.Stdin
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 	} else {
-		dirUrl := fmt.Sprintf(DefaultInfoLocation, containerName)
-		if err := os.Mkdir(dirUrl, 0622); err != nil {
-			log.Errorf("Mkdir dir %s error: %v", dirUrl, err)
-			return nil, nil
-		}
 		stdLogFilePath := dirUrl + ContainerLogFile
 		stdLogFile, err := os.Create(stdLogFilePath)
 		if err != nil {
@@ -73,10 +78,9 @@ func NewParentProcess(containerName string, tty bool, volume string) (*exec.Cmd,
 	}
 
 	cmd.ExtraFiles = []*os.File{readPipe}
-	mntUrl := "/root/mnt/"
-	rootUrl := "/root/"
-	NewWorkSpace(rootUrl, mntUrl, volume)
-	cmd.Dir = mntUrl
+	cmd.Dir = fmt.Sprintf(MntUrl, containerName)
+	cmd.Env = append(os.Environ(), envSlice...)
+	NewWorkSpace(volume, containerName, imageName)
 
 	return cmd, writePipe
 }

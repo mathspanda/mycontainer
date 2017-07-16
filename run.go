@@ -12,14 +12,14 @@ import (
 	"time"
 )
 
-func Run(containerName string, tty bool, cmdArray []string, res *subsystems.ResourceConfig, volume string) {
+func Run(containerName string, tty bool, cmdArray []string, res *subsystems.ResourceConfig, volume string, imageName string, envSlice []string) {
 	id := randStringBytes(10)
 	if containerName == "" {
 		containerName = id
 	}
 	fmt.Fprintln(os.Stdout, containerName)
 
-	parent, writePipe := container.NewParentProcess(containerName, tty, volume)
+	parent, writePipe := container.NewParentProcess(containerName, tty, volume, imageName, envSlice)
 	if parent == nil {
 		log.Error("New parent process error")
 		return
@@ -36,7 +36,7 @@ func Run(containerName string, tty bool, cmdArray []string, res *subsystems.Reso
 	}
 
 	// cgroups
-	cgroupManager := cgroups.NewCgroupManager("mycontainer")
+	cgroupManager := cgroups.NewCgroupManager(id)
 	defer cgroupManager.Destroy()
 	cgroupManager.Set(res)
 	cgroupManager.Apply(parent.Process.Pid)
@@ -45,7 +45,7 @@ func Run(containerName string, tty bool, cmdArray []string, res *subsystems.Reso
 
 	if tty {
 		parent.Wait()
-		container.DeleteWorkSpace("/root/", "/root/mnt/", volume)
+		container.DeleteWorkSpace(volume, containerName)
 		container.DeleteContainerInfo(containerName)
 		os.Exit(0)
 	}
