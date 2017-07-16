@@ -1,8 +1,8 @@
 package main
 
 import (
-	"os/exec"
 	log "github.com/Sirupsen/logrus"
+	"os/exec"
 )
 
 func commitContainer(imageName string) {
