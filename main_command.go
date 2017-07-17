@@ -43,7 +43,7 @@ var runCommand = cli.Command{
 			Usage: "container name",
 		},
 		cli.StringSliceFlag{
-			Name: "e",
+			Name:  "e",
 			Usage: "set environment",
 		},
 	},
