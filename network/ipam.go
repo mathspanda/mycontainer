@@ -119,7 +119,7 @@ func (ipam *IPAM) Release(subnet *net.IPNet, ipaddr *net.IP) error {
 	releaseIP := ipaddr.To4()
 	releaseIP[3] -= 1
 	for t := uint(4); t > 0; t -= 1 {
-		c += int(releaseIP[t-1]-subnet.IP[t-1]) << ((4 - t) * 8)
+		c += int(releaseIP[t-1]-subnet.IP.To4()[t-1]) << ((4 - t) * 8)
 	}
 
 	ipalloc := []byte((*ipam.Subnets)[subnet.String()])

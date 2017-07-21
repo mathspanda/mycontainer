@@ -22,6 +22,7 @@ func (d *BridgeNetworkDriver) Create(subnet string, name string) (*Network, erro
 	n := &Network{
 		Name:    name,
 		IpRange: ipRange,
+		Driver: d.Name(),
 	}
 	err := d.initBridge(n)
 	if err != nil {
@@ -63,6 +64,29 @@ func (d *BridgeNetworkDriver) Delete(network Network) error {
 }
 
 func (d *BridgeNetworkDriver) Connect(network *Network, endpoint *Endpoint) error {
+	bridgeName := network.Name
+	br, err := netlink.LinkByName(bridgeName)
+	if err != nil {
+		return nil
+	}
+
+	la := netlink.NewLinkAttrs()
+	la.Name = endpoint.ID[:5]
+	la.MasterIndex = br.Attrs().Index
+
+	endpoint.Device = netlink.Veth{
+		LinkAttrs: la,
+		PeerName: "cif-" + endpoint.ID[:5],
+	}
+
+	if err = netlink.LinkAdd(&endpoint.Device); err != nil {
+		return fmt.Errorf("Error add veth device: %v", err)
+	}
+
+	if err = netlink.LinkSetUp(&endpoint.Device); err != nil {
+		return fmt.Errorf("Error up veth device: %v", err)
+	}
+
 	return nil
 }
 

@@ -93,6 +93,7 @@ func (nw *Network) load(dumpPath string) error {
 }
 
 func (nw *Network) remove(dumpPath string) error {
+	defer delete(networks, nw.Name)
 	if _, err := os.Stat(path.Join(dumpPath, nw.Name)); err != nil {
 		if os.IsNotExist(err) {
 			return nil
@@ -181,7 +182,7 @@ func ListNetwork() {
 	w := tabwriter.NewWriter(os.Stdout, 12, 1, 3, ' ', 0)
 	fmt.Fprint(w, "NAME\tIPRange\tDriver\n")
 	for _, nw := range networks {
-		fmt.Fprintf(w, "%s\t%s\t%s", nw.Name, nw.IpRange.String(), nw.Driver)
+		fmt.Fprintf(w, "%s\t%s\t%s\n", nw.Name, nw.IpRange.String(), nw.Driver)
 	}
 	if err := w.Flush(); err != nil {
 		log.Errorf("network list flush error: %v", err)
