@@ -5,11 +5,15 @@ import (
 	"fmt"
 	log "github.com/Sirupsen/logrus"
 	"github.com/vishvananda/netlink"
+	"github.com/vishvananda/netns"
 	"mycontainer/container"
 	"net"
 	"os"
+	"os/exec"
 	"path"
 	"path/filepath"
+	"runtime"
+	"strings"
 	"text/tabwriter"
 )
 
@@ -133,10 +137,11 @@ func Connect(networkName string, cinfo *container.ContainerInfo) error {
 
 	ep := &Endpoint{
 		ID:          fmt.Sprintf("%s-%s", cinfo.Id, networkName),
-		IPAddress:   ip,
+		IPAddress:   ip.To4(),
 		Network:     network,
 		PortMapping: cinfo.PortMapping,
 	}
+
 	if err := drivers[network.Driver].Connect(network, ep); err != nil {
 		return err
 	}
@@ -190,10 +195,85 @@ func ListNetwork() {
 }
 
 func configEndpointIpAddressAndRoute(ep *Endpoint, cinfo *container.ContainerInfo) error {
+	peerLink, err := netlink.LinkByName(ep.Device.PeerName)
+	if err != nil {
+		return fmt.Errorf("Error get device %s: %v", ep.Device.PeerName, err)
+	}
+
+	defer enterContainerNetns(&peerLink, cinfo)()
+
+	interfaceIP := *ep.Network.IpRange
+	interfaceIP.IP = ep.IPAddress
+
+	if err = setInterfaceUP(ep.Device.PeerName); err != nil {
+		return fmt.Errorf("set veth peer up error: %v", err)
+	}
+
+	if err = setInterfaceUP("lo"); err != nil {
+		return fmt.Errorf("set lo up error: %v", err)
+	}
+
+	if err = setInterfaceIP(ep.Device.PeerName, interfaceIP.String()); err != nil {
+		return fmt.Errorf("set veth peer ip error: %v", err)
+	}
+
+	_, cidr, _ := net.ParseCIDR("0.0.0.0/0")
+	defaultRoute := &netlink.Route{
+		LinkIndex: peerLink.Attrs().Index,
+		Gw:        ep.Network.IpRange.IP,
+		Dst:       cidr,
+	}
+	if err = netlink.RouteAdd(defaultRoute); err != nil {
+		return fmt.Errorf("add default route error: %v", err)
+	}
+
 	return nil
 }
 
+func enterContainerNetns(link *netlink.Link, cinfo *container.ContainerInfo) func() {
+	f, err := os.OpenFile(fmt.Sprintf("/proc/%s/ns/net", cinfo.Pid), os.O_RDONLY, 0)
+	if err != nil {
+		log.Errorf("get container net namespace error: %v", err)
+	}
+
+	nsFD := f.Fd()
+
+	runtime.LockOSThread()
+
+	if err := netlink.LinkSetNsFd(*link, int(nsFD)); err != nil {
+		log.Errorf("set link netns error: %v", err)
+	}
+
+	origns, err := netns.Get()
+	if err != nil {
+		log.Errorf("get current netns error: %v", err)
+	}
+
+	if err = netns.Set(netns.NsHandle(nsFD)); err != nil {
+		log.Errorf("set netns error: %v", err)
+	}
+
+	return func() {
+		netns.Set(origns)
+		origns.Close()
+		runtime.UnlockOSThread()
+		f.Close()
+	}
+}
+
 func configPortMapping(ep *Endpoint, cinfo *container.ContainerInfo) error {
+	for _, pm := range cinfo.PortMapping {
+		portMapping := strings.Split(pm, ":")
+		if len(portMapping) != 2 {
+			log.Errorf("port mapping format error")
+			continue
+		}
+
+		iptablesCmd := fmt.Sprintf("-t nat -A PREROUTING -p tcp -m tcp --dport %s -j DNAT --to-destination %s:%s", portMapping[0], ep.IPAddress, portMapping[1])
+		if _, err := exec.Command("iptables", strings.Split(iptablesCmd, " ")...).CombinedOutput(); err != nil {
+			log.Errorf("iptables add DNAT rule error: %v", err)
+		}
+	}
 	return nil
 }
 

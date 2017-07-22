@@ -29,7 +29,7 @@ var (
 	ConfigName          string = "config.json"
 )
 
-func RecordContainerInfo(id string, containerPid int, containerName string, commandArray []string, volume string) (string, error) {
+func RecordContainerInfo(id string, containerPid int, containerName string, commandArray []string, volume string, portMapping []string) (string, error) {
 	createTime := time.Now().Format("2006-01-02 15:04:05")
 	command := strings.Join(commandArray, " ")
 	//if containerName == "" {
@@ -37,13 +37,14 @@ func RecordContainerInfo(id string, containerPid int, containerName string, comm
 	//}
 
 	containerInfo := &ContainerInfo{
-		Id:         id,
-		Pid:        strconv.Itoa(containerPid),
-		Name:       containerName,
-		Command:    command,
-		CreateTime: createTime,
-		Status:     RUNNING,
-		Volume:     volume,
+		Id:          id,
+		Pid:         strconv.Itoa(containerPid),
+		Name:        containerName,
+		Command:     command,
+		CreateTime:  createTime,
+		Status:      RUNNING,
+		Volume:      volume,
+		PortMapping: portMapping,
 	}
 
 	jsonBytes, err := json.Marshal(containerInfo)

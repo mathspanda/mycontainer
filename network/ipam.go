@@ -96,9 +96,10 @@ func (ipam *IPAM) Allocate(subnet *net.IPNet) (ip net.IP, err error) {
 			(*ipam.Subnets)[subnet.String()] = string(ipalloc)
 			ipam.dump()
 
-			ip = subnet.IP
+			subnetIP := subnet.IP.To4()
+			ip = net.IPv4(subnetIP[0], subnetIP[1], subnetIP[2], subnetIP[3]).To4()
 			for t := uint(4); t > 0; t -= 1 {
-				[]byte(ip)[4-t] += uint8(c >> ((t - 1) * 8))
+				ip[4-t] += uint8(c >> ((t - 1) * 8))
 			}
 			ip[3] += 1
 			break

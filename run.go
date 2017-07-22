@@ -10,9 +10,11 @@ import (
 	"os"
 	"strings"
 	"time"
+	"mycontainer/network"
+	"strconv"
 )
 
-func Run(containerName string, tty bool, cmdArray []string, res *subsystems.ResourceConfig, volume string, imageName string, envSlice []string) {
+func Run(containerName string, tty bool, cmdArray []string, res *subsystems.ResourceConfig, volume string, imageName string, envSlice []string, net string, portMapping []string) {
 	id := randStringBytes(10)
 	if containerName == "" {
 		containerName = id
@@ -29,7 +31,7 @@ func Run(containerName string, tty bool, cmdArray []string, res *subsystems.Reso
 	}
 
 	// record container info
-	containerName, err := container.RecordContainerInfo(id, parent.Process.Pid, containerName, cmdArray, volume)
+	containerName, err := container.RecordContainerInfo(id, parent.Process.Pid, containerName, cmdArray, volume, portMapping)
 	if err != nil {
 		log.Errorf("Record container info error: %v", err)
 		return
@@ -40,6 +42,20 @@ func Run(containerName string, tty bool, cmdArray []string, res *subsystems.Reso
 	defer cgroupManager.Destroy()
 	cgroupManager.Set(res)
 	cgroupManager.Apply(parent.Process.Pid)
+
+	if net != "" {
+		network.Init()
+		containerInfo := &container.ContainerInfo{
+			Id: id,
+			Pid: strconv.Itoa(parent.Process.Pid),
+			Name: containerName,
+			PortMapping: portMapping,
+		}
+		if err := network.Connect(net, containerInfo); err != nil {
+			log.Errorf("Error connect network: %v", err)
+			return
+		}
+	}
 
 	sendInitCommand(cmdArray, writePipe)
 

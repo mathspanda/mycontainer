@@ -6,8 +6,8 @@ import (
 	"github.com/urfave/cli"
 	"mycontainer/cgroups/subsystems"
 	"mycontainer/container"
-	"os"
 	"mycontainer/network"
+	"os"
 )
 
 var runCommand = cli.Command{
@@ -47,6 +47,14 @@ var runCommand = cli.Command{
 			Name:  "e",
 			Usage: "set environment",
 		},
+		cli.StringFlag{
+			Name:  "net",
+			Usage: "set network",
+		},
+		cli.StringSliceFlag{
+			Name:  "p",
+			Usage: "port mapping",
+		},
 	},
 	Action: func(context *cli.Context) error {
 		if len(context.Args()) < 1 {
@@ -77,7 +85,10 @@ var runCommand = cli.Command{
 			CpuShare:    context.String("cpushare"),
 		}
 
-		Run(containerName, tty, cmdArray, resConf, volume, imageName, envSlice)
+		net := context.String("net")
+		portMapping := context.StringSlice("p")
+
+		Run(containerName, tty, cmdArray, resConf, volume, imageName, envSlice, net, portMapping)
 		return nil
 	},
 }
@@ -178,19 +189,19 @@ var removeCommand = cli.Command{
 }
 
 var networkCommand = cli.Command{
-	Name: "network",
+	Name:  "network",
 	Usage: "container network commands",
-	Subcommands: []cli.Command {
+	Subcommands: []cli.Command{
 		{
-			Name: "create",
+			Name:  "create",
 			Usage: "create a container network",
-			Flags: []cli.Flag {
+			Flags: []cli.Flag{
 				cli.StringFlag{
-					Name: "driver",
+					Name:  "driver",
 					Usage: "network driver",
 				},
 				cli.StringFlag{
-					Name: "subnet",
+					Name:  "subnet",
 					Usage: "subnet cidr",
 				},
 			},
@@ -207,7 +218,7 @@ var networkCommand = cli.Command{
 			},
 		},
 		{
-			Name: "list",
+			Name:  "list",
 			Usage: "list container network",
 			Action: func(context *cli.Context) error {
 				network.Init()
@@ -216,7 +227,7 @@ var networkCommand = cli.Command{
 			},
 		},
 		{
-			Name: "remove",
+			Name:  "remove",
 			Usage: "remove container network",
 			Action: func(context *cli.Context) error {
 				if len(context.Args()) < 1 {

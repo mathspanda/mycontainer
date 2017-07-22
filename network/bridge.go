@@ -1,12 +1,12 @@
 package network
 
 import (
-	log "github.com/Sirupsen/logrus"
-	"net"
-	"strings"
-	"github.com/vishvananda/netlink"
 	"fmt"
+	log "github.com/Sirupsen/logrus"
+	"github.com/vishvananda/netlink"
+	"net"
 	"os/exec"
+	"strings"
 )
 
 type BridgeNetworkDriver struct {
@@ -22,7 +22,7 @@ func (d *BridgeNetworkDriver) Create(subnet string, name string) (*Network, erro
 	n := &Network{
 		Name:    name,
 		IpRange: ipRange,
-		Driver: d.Name(),
+		Driver:  d.Name(),
 	}
 	err := d.initBridge(n)
 	if err != nil {
@@ -76,7 +76,7 @@ func (d *BridgeNetworkDriver) Connect(network *Network, endpoint *Endpoint) erro
 
 	endpoint.Device = netlink.Veth{
 		LinkAttrs: la,
-		PeerName: "cif-" + endpoint.ID[:5],
+		PeerName:  "cif-" + endpoint.ID[:5],
 	}
 
 	if err = netlink.LinkAdd(&endpoint.Device); err != nil {
@@ -134,13 +134,30 @@ func setInterfaceUP(interfaceName string) error {
 	if err := netlink.LinkSetUp(iface); err != nil {
 		return fmt.Errorf("Error enabling interface for %s: %v", interfaceName, err)
 	}
+
 	return nil
 }
 
 func setupIPTables(bridgeName string, subnet *net.IPNet) error {
 	iptablesCmd := fmt.Sprintf("-t nat -A POSTROUTING -s %s ! -o %s -j MASQUERADE", subnet.String(), bridgeName)
 	if _, err := exec.Command("iptables", strings.Split(iptablesCmd, " ")...).CombinedOutput(); err != nil {
-		log.Errorf("iptables error: %v", err)
+		log.Errorf("iptables error 1: %v", err)
 	}
+
+	iptablesCmd = fmt.Sprintf("-A FORWARD -i %s -o %s -j ACCEPT", bridgeName, bridgeName)
+	if _, err := exec.Command("iptables", strings.Split(iptablesCmd, " ")...).CombinedOutput(); err != nil {
+		log.Errorf("iptables error 2: %v", err)
+	}
+
+	iptablesCmd = fmt.Sprintf("-A FORWARD -i %s ! -o %s -j ACCEPT", bridgeName, bridgeName)
+	if _, err := exec.Command("iptables", strings.Split(iptablesCmd, " ")...).CombinedOutput(); err != nil {
+		log.Errorf("iptables error 3: %v", err)
+	}
+
+	iptablesCmd = fmt.Sprintf("-A FORWARD -o %s -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT", bridgeName)
+	if _, err := exec.Command("iptables", strings.Split(iptablesCmd, " ")...).CombinedOutput(); err != nil {
+		log.Errorf("iptables error 4: %v", err)
+	}
+
 	return nil
 }
